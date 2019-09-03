@@ -151,7 +151,7 @@ meshScale = [0.001, 0.001 ,0.001]
 ObjPos = [0,0,0.1]
 ObjOri = p.getQuaternionFromEuler([0,math.pi/8,math.pi/2])
 
-model_fn = "./objs/ycbv/obj_000003.obj"
+model_fn = "./objs/obj_000003.obj"
 visualShapeId = p.createVisualShape(shapeType=p.GEOM_MESH,
                                     fileName=model_fn,
                                     rgbaColor=[1, 1, 1, 1],
