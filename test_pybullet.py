@@ -51,7 +51,7 @@ class robot_gripper():
             if(self.contact[j_id]):
                 #dynamics = p.getDynamicsInfo(self.handId,j)
                 
-                p.changeDynamics(self.handId, linkIndex=j,rollingFriction=0.5,lateralFriction=0.1)#,contactStiffness=0.001,contactDamping=0.99)
+                p.changeDynamics(self.handId, linkIndex=j,rollingFriction=0.7)#,lateralFriction=0.1)#,contactStiffness=0.001,contactDamping=0.99)
             else:
                 pass
                 #p.changeDynamics(self.handId, linkIndex=j,contactStiffness=0.1,contactDamping=0.1)
@@ -138,7 +138,7 @@ physicsClient = p.connect(p.GUI)#or p.DIRECT for non-graphical version
 p.setAdditionalSearchPath(pybullet_data.getDataPath()) #optionally
 p.setGravity(0,0,-10)
 planeId = p.loadURDF("plane.urdf")
-initPos = [0,0,0.37]
+initPos = [0,0,0.46]
 initOri = p.getQuaternionFromEuler([0,math.pi,0])
 hand = robot_gripper(initPos,initOri)
 
@@ -146,7 +146,7 @@ hand = robot_gripper(initPos,initOri)
 meshScale = [0.001, 0.001 ,0.001]
 #meshScale = [1, 1 ,1]
 #the visual shape and collision shape can be re-used by all createMultiBody instances (instancing)
-ObjPos = [0,0,0.1]
+ObjPos = [0,0,0.2]
 ObjOri = p.getQuaternionFromEuler([0,math.pi/8,math.pi/2])
 
 model_fn = "./objs/obj_000003.obj"
@@ -195,9 +195,9 @@ for i in range (100000):
     if(t_wait2>0):
         t_wait2+=1.0/240.0
     if(grasp==True or toolPos>initPos or t>5):
-        p.changeConstraint(obj_constraint,maxForce=0)
         t_wait+=1.0/240.0
         if(t_wait>4 and tograsp==close_angle):
+           p.changeConstraint(obj_constraint,maxForce=0)
            toolPos[2] = min(toolPos[2]+0.0005,0.7)
            p.changeConstraint(hand.base_constraint, toolPos, initOri, maxForce=100000)
         if(toolPos[2]==0.7): t_wait2+=1.0/240.0
