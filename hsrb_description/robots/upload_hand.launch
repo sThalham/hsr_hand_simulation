@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+    <arg name="gui" default="false" />
+    <arg name="robot" default="hand_gazebo" />
+    <param name="robot_description" command="cat '/home/kiru/common_ws/pybullet/hsrb_description/robots/hand_gazebo.urdf'" /> 
+
+    <rosparam file="/home/kiru/common_ws/pybullet/hsrb_description/robots/control.yml" command="load"/>
+
+    <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
+     output="screen" ns="hand_gazebo" args="hand_position_controller hand_l_controller hand_r_controller joint_state_controller"/>
+
+
+    <node name="hand_gazebo" pkg="gazebo_ros" type="spawn_model" output="screen"
+          args="-urdf -param robot_description -model hand_gazebo -robot_namespace hand_gazebo" />
+    
+    <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" />
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher" />
+  
+    <param name="use_gui" value="$(arg gui)"/>
+    <!-- <node name="rviz" pkg="rviz" type="rviz" args="-d /home/kiru/common_ws/pybullet/hsrb_description/config/hand.rviz"/> -->
+    
+    
+</launch>

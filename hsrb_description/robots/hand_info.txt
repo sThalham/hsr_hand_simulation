@@ -1,0 +1,78 @@
+hand_motor_joint
+-> hand_l_proximal_joint
+-> hand_r_proximal_joint (same)
+-> hand_l_distal_joint (multiplier:-1.0, offset=-0.087)
+-> hand_r_distal_joint (multiplier:-1.0, offset=-0.087)
+
+
+hand_l_spring_proximal_joint
+    -> hand_l_mimic_distal_joint (multiplier : -1.0)
+hand_r_spring_proximal_joint
+  -> hand_r_mimic_distal_joint (multiplier : -1.0)
+
+  <joint name="hand_r_proximal_joint" type="revolute">
+    <origin rpy="0.0 0.0 0.0" xyz="-0.01675 0.0245 -0.0175"/>
+    <axis xyz="-1.0 0.0 0.0"/>
+    <limit effort="100.0" lower="-0.798" upper="1.24" velocity="1.0"/>
+    <parent link="hand_palm_link"/>
+    <child link="hand_r_proximal_link"/>
+    <dynamics damping="0.1" friction="0.0001"/>
+  </joint>
+
+
+hsrb_controller_config_gazebo
+    gripper_controller:
+      type: "hsrb_gripper_controller/HrhGripperController"
+      joints:
+        - hand_motor_joint
+      constraints:
+        goal_time: 10.0
+      follow_joint_trajectory_action_monitor_rate: 20
+      grasp_action_monitor_rate: 20
+      apply_force_action_monitor_rate: 20
+      positoin_goal_tolerance: 0.2
+
+
+
+      <transmission name="hand_l_spring_proximal_joint_transmission">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="hand_l_spring_proximal_joint">
+          <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="hand_l_spring_proximal_joint_actuator">
+          <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+          <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+      </transmission>
+
+      <transmission name="hand_r_spring_proximal_joint_transmission">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="hand_r_spring_proximal_joint">
+          <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="hand_r_spring_proximal_joint_actuator">
+          <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+          <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+      </transmission>
+
+      <transmission name="hand_l_mimic_distal_joint_transmission">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="hand_l_mimic_distal_joint">
+          <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="hand_l_mimic_distal_joint_actuator">
+          <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+          <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+      </transmission>
+      <transmission name="hand_r_mimic_distal_joint_transmission">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="hand_r_mimic_distal_joint">
+          <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="hand_r_mimic_distal_joint_actuator">
+          <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+          <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+      </transmission>
