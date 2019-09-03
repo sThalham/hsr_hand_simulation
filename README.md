@@ -11,11 +11,20 @@ Physics engine: bullet physics (pybullet api)
 
 ### Description of this project
 This project will simulate the grasp pose of various objects in a virtual world.
-
 ![image](imgs/test.jpg "Pybullet physics for the simulation")
 
+I was so impressed by this paper and the simulation performed in the paper.
+6-DOF GraspNet: Variational Grasp Generation for Object Manipulation, Mousavian et al., ICCV 2019.
 
-The gipper will be fixed vertically while objects can be placed arbitrary poses. Thus, the relative pose between an object and the hand is measured and saved with grasp annotation (whether it was a successful grap or a failure)
+In the video, multple grippers are spawned to test grasp poses.
+[Video](https://research.nvidia.com/sites/default/files/pubs/2019-10_6-DOF-GraspNet%3A-Variational/supplementary_video.mp4 "[Video]") 
+[Paper](https://arxiv.org/abs/1905.10520 "[Paper]")
+
+I decided to build a similar environment. Instead of FLEX simulation used in the paper, this one uses more common physics engien, bullet.
+
+The URDF file for the gripper used in the gazebo simulation is modified to work properly with bullet engine. However, some parameters such as spring properties of the gripper are not optimized. Therefore, this is still "unreal" simulation, but hopefully able to suggest possible way to grasp objects.
+
+The gripper will be fixed vertically while objects can be placed arbitrary poses. Thus, the relative pose between an object and the hand is measured and saved with grasp annotation (whether it was a successful grap or a failure)
 
 Current implementation:
 - test_pybullet.py: simple grasp simulation using the hand of HSR robot
@@ -42,7 +51,11 @@ make test_vhacd
 ```
 
 Further plans:
-- Optimization of parameters: very challenging... stay at the local optimum.
-- Spwan multiple grippers and objects to simulate multiple grasp poses simultaneously.
-- Annotate grasp poses
-- Integrate with a pose estimator (Pix2Pose) to grasp an object based on successful grasp poses. 
+1. For this simulation
+   - Optimization of parameters: very challenging... stay at the local optimum.
+   - Spwan multiple grippers and objects to simulate multiple grasp poses simultaneously.
+   - Annotate grasp poses
+   - Integrate with a pose estimator (Pix2Pose) to grasp an object based on successful grasp poses. 
+
+2. Other tools to be developed
+   - Manual grasp pose annotation with verification using this simulation engine. GUI has to be made to manipulate the gripper and objects easily. 

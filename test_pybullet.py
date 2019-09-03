@@ -134,8 +134,6 @@ class robot_gripper():
             return True
         else:
             return False
-
-
 physicsClient = p.connect(p.GUI)#or p.DIRECT for non-graphical version
 p.setAdditionalSearchPath(pybullet_data.getDataPath()) #optionally
 p.setGravity(0,0,-10)
@@ -212,27 +210,19 @@ for i in range (100000):
     
 p.disconnect()
 
-
 '''
-#flexible fixed joint example
-#1) fix the object at a pos + limited force (small change is available)
-#2) closing the gripper
-#3) remove constraint
-#4) shaking(?) or check if stay
+Grasp pose is defined in the object coordinate space.
+T_grasp @ obj_coordinate frame
+I_object @ obj_coordinate_frame
 
-cid = p.createConstraint(cubeId,-1,-1,-1,p.JOINT_FIXED,[0,0,0],[0,0,0],[0,0,1])
-p.changeConstraint(cid, maxForce=20)
-print (cid)
-print (p.getConstraintUniqueId(0))
-forceId = p.addUserDebugParameter("force",0,11,10)
+1. Define T_grasp obj_coordinate frame
+2. Transfrom the T_grasp to be aligned to [0,0,-1]
 
-prev=[0,0,1]
-a=-math.pi
-while 1:
-        force = p.readUserDebugParameter(forceId)
-        p.changeConstraint(cid, maxForce=force)
-        s = p.getConstraintState(cid)
-        print(s)
-
-p.removeConstraint(cid)
+3. tool_Position = [0,0,0.5]
+   tool_Orient = p.getQuaternionFromEuler([0,math.pi,0])
+   T_grasp * T = T_target
+   T_(obj2world)  = inv(T_grasp)*T_target
+   Transform the object using T_(obj2world)s
+4. Perform: simulation
+5. Annotate, T_grasp -> success, duration of grasp (ms)
 '''
