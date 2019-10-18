@@ -77,7 +77,7 @@ class RobotGripper:
         self.goal_stay = 0
         self.sign = 0
 
-    def update_grasp(self, target_pos, speed, time_step=1./240.):
+    def update_grasp(self, target_pos, speed, time_step):
         """
         [input]
         is_open:true for opening, false for closing
@@ -90,7 +90,7 @@ class RobotGripper:
         """
         if self.sign == 0:
             self.sign = np.sign(target_pos - self.current_pos)
-        step = self.sign * speed / 240
+        step = self.sign * speed * time_step #/ 240
         
         # Check current position of the gripper
         current_joints = []
@@ -181,25 +181,26 @@ def main():
     close_angle = -0.05
     to_grasp = close_angle
     speed = 0.5
+    time_step = TIME_STEP
     t_wait = 0
     t_wait2 = 0
     t = 0
     tool_pos = init_pos
     for i in range(100000):
-        grasp = hand.update_grasp(to_grasp, speed)
+        grasp = hand.update_grasp(to_grasp, speed, time_step)
         p.stepSimulation()
-        time.sleep(TIME_STEP)  # possible to increase the speed of the simulation.
-        t = t + TIME_STEP
+        time.sleep(time_step)  # possible to increase the speed of the simulation
+        t = t + time_step
         if t_wait2 > 0:
-            t_wait2 += TIME_STEP
+            t_wait2 += time_step
         if grasp or tool_pos > init_pos or t > 5:
-            t_wait += TIME_STEP
+            t_wait += time_step
             if t_wait > 4 and to_grasp == close_angle:
                 p.changeConstraint(obj_constraint, maxForce=0)
                 tool_pos[2] = min(tool_pos[2] + 0.0005, 0.7)
                 p.changeConstraint(hand.base_constraint, tool_pos, init_ori, maxForce=100000)
             if tool_pos[2] == 0.7:
-                t_wait2 += TIME_STEP
+                t_wait2 += time_step
             if t_wait2 > 2 and to_grasp == close_angle:
                 hand.reset_internal_val()
                 to_grasp = 1
