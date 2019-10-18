@@ -25,7 +25,9 @@ class RobotGripper:
         self.n_joints = p.getNumJoints(self.hand_id)
         self.joint_id = []
         self.joint_names = []
-        self.target_joint_names = [b'hand_l_proximal_joint',b'hand_r_proximal_joint',b'hand_l_distal_joint',b'hand_r_distal_joint']
+        self.target_joint_names = [b'hand_l_proximal_joint', b'hand_r_proximal_joint', b'hand_l_distal_joint',
+                                   b'hand_r_distal_joint', b'hand_palm_joint']
+        self.hand_palm_joint_id = -1
         self.target_joint = []
         self.multi = []
         self.offset = []
@@ -35,11 +37,9 @@ class RobotGripper:
             joints = p.getJointInfo(self.hand_id, i)
             self.joint_id.append(joints[0])
             self.joint_names.append(joints[1])
-            # print(joints[0], joints[1], joints[12])
             if joints[1] in self.target_joint_names:
                 self.target_joint.append(joints[0])
-                if joints[1] in [b'hand_l_proximal_joint',b'hand_r_proximal_joint']:
-                    # print(joints[0], joints[1], joints[2])
+                if joints[1] in [b'hand_l_proximal_joint', b'hand_r_proximal_joint']:
                     self.multi.append(1)
                     self.offset.append(0)
                     self.forces.append(1)
@@ -50,7 +50,15 @@ class RobotGripper:
                     self.forces.append(1000)
                     self.contact.append(True)
 
-        # print(p.getBodyInfo(self.hand_id))
+        for i in range(self.n_joints):
+            if self.joint_names[i] == b'hand_palm_joint':
+                self.hand_palm_joint_id = self.joint_id[i]
+                break
+        if self.hand_palm_joint_id >= 0:
+            print('hand_palm_joint', self.joint_id[self.hand_palm_joint_id])
+        else:
+            print('ERROR: Not id for hand_palm_joint')
+
         for j_id, j in enumerate(self.target_joint):
             if self.contact[j_id]:
                 # dynamics = p.getDynamicsInfo(self.hand_id,j)
@@ -138,22 +146,34 @@ class RobotGripper:
 
 
 def grasp_example():
-    p.connect(p.GUI)  # or p.DIRECT for non-graphical version
+    #p.connect(p.DIRECT)
+    p.connect(p.GUI)
     p.setAdditionalSearchPath(pybullet_data.getDataPath())  # optional
     p.setGravity(0, 0, -10)
-    p.loadURDF("plane.urdf")
-    init_pos = [0, 0, 0.46]
+
+    # Gripper
+    init_pos = [0, 0, 0.5]
     init_ori = p.getQuaternionFromEuler([0, math.pi, 0])
     hand = RobotGripper(init_pos, init_ori)
+
+    # Plane
+    p.loadURDF("plane.urdf")
+
+    # Select the object
+    grasp_watering_can = False
+    if grasp_watering_can:
+        model_fn = "./objs/can_linemod.obj"
+        obj_pos = [-0.1, 0, 0.1]
+        obj_ori = p.getQuaternionFromEuler([0, math.pi/2, math.pi/2])
+    else:
+        model_fn = "./objs/obj_000003.obj"
+        obj_pos = [0, 0, 0.1]
+        obj_ori = p.getQuaternionFromEuler([0, 0, 0])
+        #obj_pos = [0, 0, 0.015]
+        #obj_ori = p.getQuaternionFromEuler([0, math.pi/2, 0])
     mesh_scale = [0.001, 0.001, 0.001]
 
-    # the visual shape and collision shape can be re-used by all createMultiBody instances (instancing)
-    obj_pos = [0, 0, 0.1]
-    # obj_ori = p.getQuaternionFromEuler([0, math.pi/8, math.pi/2])
-    obj_ori = p.getQuaternionFromEuler([0, 0, 0])
-
-    model_fn = "./objs/obj_000003.obj"
-    # model_fn = "./objs/can_linemod.obj"
+    # Add object to the environment
     visual_shape_id = p.createVisualShape(shapeType=p.GEOM_MESH,
                                           fileName=model_fn,
                                           rgbaColor=[1, 1, 1, 1],
@@ -177,14 +197,16 @@ def grasp_example():
                                         parentFramePosition=[0, 0, 0],
                                         childFramePosition=obj_pos,
                                         childFrameOrientation=obj_ori)
-    p.changeConstraint(obj_constraint, maxForce=1)
+    #p.changeConstraint(obj_constraint, maxForce=1)
+    p.changeConstraint(obj_constraint, maxForce=0)
 
     time.sleep(2)
+    minimum_grasp_height = 0.225
     close_angle = -0.05
     speed = 0.5
     time_step = TIME_STEP
     move_step = 0.0005
-    gripper_offset = 0.15
+    gripper_offset = 0.0125
     approach_timeout = 10
     grasp_timeout = 5
     lift_timeout = 15
@@ -199,8 +221,23 @@ def grasp_example():
     tool_pos = init_pos
     curr_hand_pos, _ = p.getBasePositionAndOrientation(hand.hand_id)
     start_obj_pos, _ = p.getBasePositionAndOrientation(target_obj)
-    ray = p.rayTest([0, 0, curr_hand_pos[2] - gripper_offset], [0, 0, 0])
-    reach_limit = ray[0][3][2] + gripper_offset
+    closest_points = p.getClosestPoints(hand.hand_id, target_obj, init_pos[2])
+    max_distance = -1
+    check_joint = True
+    if hand.hand_palm_joint_id < 0:
+        check_joint = False
+    for c in closest_points:
+        if c[8] > max_distance:
+            if check_joint:
+                if c[3] == hand.hand_palm_joint_id:
+                    max_distance = c[8]
+            else:
+                max_distance = c[8]
+    reach_limit = init_pos[2] - max_distance + gripper_offset
+    if reach_limit < minimum_grasp_height:
+        print('WARNING: reach_limit is too close to the floor')
+        reach_limit = minimum_grasp_height
+
     t = 0
     print('STATE: Approaching')
     while tool_pos[2] > reach_limit:
@@ -244,6 +281,7 @@ def grasp_example():
             print('ERROR: Waited and did not arrive at the lift height')
             p.disconnect()
             return False
+    time.sleep(1)
 
     # Check if successful
     print('STATE: Checking success')
@@ -254,6 +292,8 @@ def grasp_example():
     if len(contacts) > 0 and lift_height - (end_obj_pos[2] - start_obj_pos[2]) <= success_threshold:
         print('Successfully grasped object!')
         success = True
+    else:
+        print('Failed to grasp object!')
 
     p.disconnect()
     return success
