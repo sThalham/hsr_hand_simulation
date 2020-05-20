@@ -5,14 +5,14 @@ import math
 import numpy as np
 import copy
 
-
-#TIME_STEP = 1./240.
-TIME_STEP = 1./480.
+# TIME_STEP = 1./240.
+TIME_STEP = 1. / 480.
 
 
 class RobotGripper:
     def __init__(self, translation, orientation, is_open=True):
-        self.hand_id = p.loadURDF("./hsrb_description/robots/hand.urdf", translation, orientation)  # , flags=p.URDF_USE_SELF_COLLISION
+        self.hand_id = p.loadURDF("./hsrb_description/robots/hand.urdf", translation,
+                                  orientation)  # , flags=p.URDF_USE_SELF_COLLISION
         self.base_constraint = p.createConstraint(
             parentBodyUniqueId=self.hand_id,
             parentLinkIndex=-1,
@@ -44,7 +44,7 @@ class RobotGripper:
                     self.multi.append(1)
                     self.offset.append(0)
                     self.forces.append(1)
-                    self.contact.append(False)  
+                    self.contact.append(False)
                 else:
                     self.multi.append(-1)
                     self.offset.append(-0.087)
@@ -63,11 +63,12 @@ class RobotGripper:
         for j_id, j in enumerate(self.target_joint):
             if self.contact[j_id]:
                 # dynamics = p.getDynamicsInfo(self.hand_id,j)
-                p.changeDynamics(self.hand_id, linkIndex=j, rollingFriction=0.7)  # , lateralFriction=0.1)#,contactStiffness=0.001,contactDamping=0.99)
+                p.changeDynamics(self.hand_id, linkIndex=j,
+                                 rollingFriction=0.7)  # , lateralFriction=0.1)#,contactStiffness=0.001,contactDamping=0.99)
             else:
                 pass
                 # p.changeDynamics(self.hand_id, linkIndex=j, contactStiffness=0.1, contactDamping=0.1)
-        
+
         if is_open:
             t_pos = 1.2
         else:
@@ -101,7 +102,7 @@ class RobotGripper:
         if self.sign == 0:
             self.sign = np.sign(target_pos - self.current_pos)
         step = self.sign * speed * time_step
-        
+
         # Check current position of the gripper
         current_joints = []
         diffs = []
@@ -120,7 +121,7 @@ class RobotGripper:
 
         self.prev_joints = current_joints
         self.current_pos = self.current_pos + step
-        
+
         if self.sign > 0:
             self.current_pos = min(self.current_pos, target_pos)
         else:
@@ -132,22 +133,22 @@ class RobotGripper:
             self.goal_stay = 0
 
         for j_id, j in enumerate(self.target_joint):
-            joint_pose = self.multi[j_id]*self.current_pos+self.offset[j_id]
+            joint_pose = self.multi[j_id] * self.current_pos + self.offset[j_id]
             p.setJointMotorControl2(bodyIndex=self.hand_id,
                                     jointIndex=j,
                                     controlMode=p.POSITION_CONTROL,  # mode = p.TORQUE_CONTROL
                                     targetPosition=joint_pose,
                                     force=self.forces[j_id],
                                     maxVelocity=5)
-        
-        if self.count_stay > 0.5/time_step or self.goal_stay > 2/time_step:
+
+        if self.count_stay > 0.5 / time_step or self.goal_stay > 2 / time_step:
             return True
         else:
             return False
 
 
 def grasp_example():
-    #p.connect(p.DIRECT)
+    # p.connect(p.DIRECT)
     p.connect(p.GUI)
     p.setAdditionalSearchPath(pybullet_data.getDataPath())  # optional
     p.setGravity(0, 0, -10)
@@ -165,13 +166,13 @@ def grasp_example():
     if grasp_watering_can:
         model_fn = "./objs/can_linemod.obj"
         obj_pos = [-0.1, 0, 0.1]
-        obj_ori = p.getQuaternionFromEuler([0, math.pi/2, math.pi/2])
+        obj_ori = p.getQuaternionFromEuler([0, math.pi / 2, math.pi / 2])
     else:
         model_fn = "./objs/obj_000003.obj"
         obj_pos = [0, 0, 0.1]
         obj_ori = p.getQuaternionFromEuler([0, 0, 0])
-        #obj_pos = [0, 0, 0.015]
-        #obj_ori = p.getQuaternionFromEuler([0, math.pi/2, 0])
+        # obj_pos = [0, 0, 0.015]
+        # obj_ori = p.getQuaternionFromEuler([0, math.pi/2, 0])
     mesh_scale = [0.001, 0.001, 0.001]
 
     # Add object to the environment
@@ -198,7 +199,7 @@ def grasp_example():
                                         parentFramePosition=[0, 0, 0],
                                         childFramePosition=obj_pos,
                                         childFrameOrientation=obj_ori)
-    #p.changeConstraint(obj_constraint, maxForce=1)
+    # p.changeConstraint(obj_constraint, maxForce=1)
     p.changeConstraint(obj_constraint, maxForce=0)
 
     time.sleep(2)
@@ -383,7 +384,7 @@ def camera_example():
     ax = plt.gca()
 
     p.connect(p.DIRECT)
-    #p.connect(p.GUI)
+    # p.connect(p.GUI)
     p.setAdditionalSearchPath(pybullet_data.getDataPath())  # optional
 
     # pybullet.loadPlugin("eglRendererPlugin")
@@ -435,8 +436,8 @@ def camera_example():
             # plt.imshow(rgb,interpolation='none')
 
             # reshape is needed
-            #np_img_arr = np.reshape(rgb, (h, w, 4))
-            #np_img_arr = np_img_arr * (1. / 255.)
+            # np_img_arr = np.reshape(rgb, (h, w, 4))
+            # np_img_arr = np_img_arr * (1. / 255.)
             dep -= np.min(dep)
             dep /= np.max(dep)
             np_img_arr = np.reshape(dep, (h, w))
@@ -458,5 +459,6 @@ def camera_example():
 
 if __name__ == '__main__':
     grasp_example()
-    #camera_example()
-    #render_example()
+    # camera_example()
+    # render_example()
+
