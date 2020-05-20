@@ -23,7 +23,8 @@
   <link name="wrist_roll_link">
   </link>
   <joint name="hand_palm_joint" type="fixed">
-    <origin rpy="0.0 0.0 3.14159265359" xyz="0.012 0.0 0.1405"/>
+    <!--origin rpy="0.0 0.0 3.14159265359" xyz="0.012 0.0 0.1405"/-->
+    <origin rpy="0.0 0.0 3.14159265359" xyz="0.012 0.0 0.0"/>
     <parent link="wrist_roll_link"/>
     <child link="hand_palm_link"/>
   </joint>

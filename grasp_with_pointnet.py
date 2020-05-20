@@ -1,12 +1,20 @@
 import pybullet as p
 import time
 import pybullet_data
+import os
 import math
 import numpy as np
 import copy
+import pickle
+import transforms3d as tf3d
+import cv2
 
 # TIME_STEP = 1./240.
 TIME_STEP = 1. / 480.
+
+base_dir = '/home/tpatten/Data/Hands/HO3D/'
+data_split = 'train'
+scene = 'ABF10'
 
 
 class RobotGripper:
@@ -147,32 +155,25 @@ class RobotGripper:
             return False
 
 
-def grasp_example():
+def grasp_example(obj_id, obj_rot, obj_trans, grasp):
     # p.connect(p.DIRECT)
     p.connect(p.GUI)
     p.setAdditionalSearchPath(pybullet_data.getDataPath())  # optional
     p.setGravity(0, 0, -10)
 
     # Gripper
-    init_pos = [0, 0, 0.5]
-    init_ori = p.getQuaternionFromEuler([0, math.pi, 0])
+    init_pos = np.copy(grasp[0:3, 3])
+    q = tf3d.quaternions.mat2quat(grasp[:3, :3])
+    init_ori = [q[1], q[2], q[3], q[0]]
+    # tf3d quaternion: w, x, y, z
+    # PyBullet quaterion: x, y, z, w
     hand = RobotGripper(init_pos, init_ori)
 
-    # Plane
-    p.loadURDF("plane.urdf")
-
-    # Select the object
-    grasp_watering_can = False
-    if grasp_watering_can:
-        model_fn = "./objs/can_linemod.obj"
-        obj_pos = [-0.1, 0, 0.1]
-        obj_ori = p.getQuaternionFromEuler([0, math.pi / 2, math.pi / 2])
-    else:
-        model_fn = "./objs/obj_000003.obj"
-        obj_pos = [0, 0, 0.1]
-        obj_ori = p.getQuaternionFromEuler([0, 0, 0])
-        # obj_pos = [0, 0, 0.015]
-        # obj_ori = p.getQuaternionFromEuler([0, math.pi/2, 0])
+    # Load the object
+    model_fn = os.path.join(base_dir, 'models', obj_id, 'vhacd.obj')
+    obj_pos = np.copy(obj_trans)
+    q = tf3d.quaternions.mat2quat(np.linalg.inv(cv2.Rodrigues(obj_rot)[0].T))
+    obj_ori = [q[1], q[2], q[3], q[0]]
     mesh_scale = [0.001, 0.001, 0.001]
 
     # Add object to the environment
@@ -202,7 +203,8 @@ def grasp_example():
     # p.changeConstraint(obj_constraint, maxForce=1)
     p.changeConstraint(obj_constraint, maxForce=0)
 
-    time.sleep(2)
+    #time.sleep(2)
+    time.sleep(1000)
     minimum_grasp_height = 0.225
     close_angle = -0.05
     speed = 0.5
@@ -214,6 +216,7 @@ def grasp_example():
     lift_timeout = 15
     success_threshold = 0.05
 
+    '''
     # Move down to grasp
     contacts = p.getContactPoints(target_obj, hand.hand_id)
     if len(contacts) > 0:
@@ -296,169 +299,44 @@ def grasp_example():
         success = True
     else:
         print('Failed to grasp object!')
+    '''
 
     p.disconnect()
-    return success
+    #return success
+    return False
 
 
-def render_example():
-    # p.connect(p.GUI)
-    p.connect(p.DIRECT)
-    p.setAdditionalSearchPath(pybullet_data.getDataPath())
-    p.setGravity(0, 0, -10)
-    p.loadURDF("plane.urdf")
-    mesh_scale = [0.001, 0.001, 0.001]
-    model_fn = "./objs/obj_000003.obj"
-    # model_fn = "./objs/can_linemod.obj"
-    obj_pos = [0, 0, 0.1]
-    obj_ori = p.getQuaternionFromEuler([0, 0, 0])
-    # Create axis
-    visual_shape_id = p.createVisualShape(shapeType=p.GEOM_MESH,
-                                          fileName=model_fn,
-                                          rgbaColor=[1, 1, 1, 1],
-                                          specularColor=[0.4, .4, 0],
-                                          meshScale=mesh_scale)
-    collision_shape_id = p.createCollisionShape(shapeType=p.GEOM_MESH,
-                                                fileName=model_fn,
-                                                meshScale=mesh_scale)
-    target_obj = p.createMultiBody(baseMass=0.01,
-                                   baseInertialFramePosition=[0, 0, 0],
-                                   baseCollisionShapeIndex=collision_shape_id,
-                                   baseVisualShapeIndex=visual_shape_id,
-                                   basePosition=obj_pos,
-                                   baseOrientation=obj_ori)
-    obj_constraint = p.createConstraint(parentBodyUniqueId=target_obj,
-                                        parentLinkIndex=-1,
-                                        childBodyUniqueId=-1,
-                                        childLinkIndex=-1,
-                                        jointType=p.JOINT_FIXED,
-                                        jointAxis=[0, 0, 0],
-                                        parentFramePosition=[0, 0, 0],
-                                        childFramePosition=obj_pos,
-                                        childFrameOrientation=obj_ori)
-    p.changeConstraint(obj_constraint, maxForce=1)
-
-    position, orientation = p.getBasePositionAndOrientation(target_obj)
-    print('Object pose: ', position, orientation)
-
-    cam_target_pos = [0.2, 0, 0.25]
-    roll = 0
-    pitch = -90.0
-    yaw = 0
-    up_axis_id = 2
-    cam_distance = 1
-    pixel_width = 640
-    pixel_height = 480
-    near_plane = 0.01
-    far_plane = 100
-    fov = 60
-
-    view_matrix = p.computeViewMatrixFromYawPitchRoll(cam_target_pos, cam_distance, yaw, pitch, roll, up_axis_id)
-    aspect = pixel_width / pixel_height
-    projection_matrix = p.computeProjectionMatrixFOV(fov, aspect, near_plane, far_plane)
-
-    img_arr = p.getCameraImage(pixel_width, pixel_height, view_matrix, projection_matrix, shadow=1,
-                               lightDirection=[1, 1, 1], renderer=p.ER_BULLET_HARDWARE_OPENGL)
-    w = img_arr[0]  # width of the image, in pixels
-    h = img_arr[1]  # height of the image, in pixels
-    rgb = img_arr[2]  # color data RGB
-    bullet_depth = img_arr[3]  # depth data
-    depth = far_plane * near_plane / (far_plane - (far_plane - near_plane) * bullet_depth)
-    # print(np.min(depth), np.max(depth))
-    rgb = np.reshape(rgb, (h, w, 4))
-    depth = np.reshape(depth, (h, w))
-
-    import scipy.misc
-    scipy.misc.toimage(rgb, cmin=0.0, cmax=255).save('/home/tpatten/rgb.png')
-    scipy.misc.toimage(depth, cmin=np.min(depth), cmax=np.max(depth)).save('/home/tpatten/depth.png')
-
-    p.disconnect()
-
-
-def camera_example():
-    import matplotlib.pyplot as plt
-    plt.ion()
-
-    img = [[1, 2, 3] * 50] * 100  # np.random.rand(200, 320)
-    image = plt.imshow(img, interpolation='none', animated=True, label="Rendering", cmap='gray')
-    ax = plt.gca()
-
-    p.connect(p.DIRECT)
-    # p.connect(p.GUI)
-    p.setAdditionalSearchPath(pybullet_data.getDataPath())  # optional
-
-    # pybullet.loadPlugin("eglRendererPlugin")
-    p.loadURDF("plane.urdf")
-    init_pos = [0, 0, 0.5]
-    init_ori = p.getQuaternionFromEuler([0, 0, 0])
-    p.loadURDF("r2d2.urdf", init_pos, init_ori)
-
-    p.setGravity(0, 0, -10)
-    camTargetPos = [0, 0, 1]
-    pitch = -90.0
-    roll = 0
-    upAxisIndex = 2
-    camDistance = 1
-    pixelWidth = 640
-    pixelHeight = 480
-    nearPlane = 0.01
-    farPlane = 100
-    fov = 60
-
-    main_start = time.time()
-    while True:
-        for yaw in range(0, 360, 120):
-            p.stepSimulation()
-            start = time.time()
-            viewMatrix = p.computeViewMatrixFromYawPitchRoll(camTargetPos, camDistance, yaw, pitch,
-                                                             roll, upAxisIndex)
-            aspect = pixelWidth / pixelHeight
-            projectionMatrix = p.computeProjectionMatrixFOV(fov, aspect, nearPlane, farPlane)
-            img_arr = p.getCameraImage(pixelWidth,
-                                       pixelHeight,
-                                       viewMatrix,
-                                       projectionMatrix,
-                                       shadow=1,
-                                       lightDirection=[1, 1, 1],
-                                       renderer=p.ER_BULLET_HARDWARE_OPENGL)
-            stop = time.time()
-            print("renderImage %f" % (stop - start))
-
-            w = img_arr[0]  # width of the image, in pixels
-            h = img_arr[1]  # height of the image, in pixels
-            rgb = img_arr[2]  # color data RGB
-            dep = img_arr[3]  # depth data
-            # print(rgb)
-            print('width = %d height = %d' % (w, h))
-
-            # note that sending the data using imshow to matplotlib is really slow, so we use set_data
-
-            # plt.imshow(rgb,interpolation='none')
-
-            # reshape is needed
-            # np_img_arr = np.reshape(rgb, (h, w, 4))
-            # np_img_arr = np_img_arr * (1. / 255.)
-            dep -= np.min(dep)
-            dep /= np.max(dep)
-            np_img_arr = np.reshape(dep, (h, w))
-            np_img_arr = np_img_arr * 255.
-            print(np.min(np_img_arr), np.max(np_img_arr))
-
-            image.set_data(np_img_arr)
-            ax.plot([0])
-            # plt.draw()
-            # plt.show()
-            plt.pause(0.01)
-
-    main_stop = time.time()
-
-    print("Total time %f" % (main_stop - main_start))
-
-    p.resetSimulation()
+def load_pickle_data(f_name):
+    with open(f_name, 'rb') as f:
+        try:
+            pickle_data = pickle.load(f, encoding='latin1')
+        except:
+            pickle_data = pickle.load(f)
+    return pickle_data
 
 
 if __name__ == '__main__':
-    grasp_example()
-    # camera_example()
-    # render_example()
+    frame_ids = sorted(os.listdir(os.path.join(base_dir, data_split, scene, 'rgb')))
 
+    for f in frame_ids:
+        f_str = f.split('.')[0]
+        f_name = os.path.join(base_dir, data_split, scene, 'meta2', f_str + '.pkl')
+        anno = load_pickle_data(f_name)
+        #f_name_2 = f_name.replace("meta", "meta2")
+        #with open(f_name_2, 'wb') as f:
+        #    pickle.dump(anno, f, protocol=2)
+
+        f_name = f_name.replace("meta2/", "meta2/grasp_bl_")
+        grasp = load_pickle_data(f_name)
+        #f_name_2 = f_name.replace("meta", "meta2")
+        #with open(f_name_2, 'wb') as f:
+        #    pickle.dump(grasp, f, protocol=2)
+
+        obj_rot = anno['objRot']
+        obj_trans = anno['objTrans']
+        obj_id = anno['objName']
+        grasp = grasp.reshape(4, 4)
+
+        grasp_example(obj_id, obj_rot, obj_trans, grasp)
+
+        sys.exit(0)
