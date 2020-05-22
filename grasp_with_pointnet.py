@@ -8,6 +8,7 @@ import copy
 import pickle
 import transforms3d as tf3d
 import cv2
+import random
 
 # TIME_STEP = 1./240.
 TIME_STEP = 1. / 480.
@@ -154,6 +155,21 @@ class RobotGripper:
         else:
             return False
 
+    def reset(self, translation, orientation, add_constraint):
+        orientation_quaternion = p.getQuaternionFromEuler(orientation)
+        p.resetBasePositionAndOrientation(self.hand_id, translation, orientation_quaternion)
+        if add_constraint:
+            self.base_constraint = p.createConstraint(
+                parentBodyUniqueId=self.hand_id,
+                parentLinkIndex=-1,
+                childBodyUniqueId=-1,
+                childLinkIndex=-1,
+                jointType=p.JOINT_FIXED,
+                jointAxis=[0, 0, 0],
+                parentFramePosition=[0, 0, 0],
+                childFramePosition=translation,
+                childFrameOrientation=orientation_quaternion)
+
 
 def grasp_example(obj_id, obj_rot, obj_trans, grasp):
     # p.connect(p.DIRECT)
@@ -200,61 +216,25 @@ def grasp_example(obj_id, obj_rot, obj_trans, grasp):
                                         parentFramePosition=[0, 0, 0],
                                         childFramePosition=obj_pos,
                                         childFrameOrientation=obj_ori)
-    # p.changeConstraint(obj_constraint, maxForce=1)
-    p.changeConstraint(obj_constraint, maxForce=0)
+    p.changeConstraint(obj_constraint, maxForce=10)
 
-    #time.sleep(2)
-    time.sleep(1000)
-    minimum_grasp_height = 0.225
-    close_angle = -0.05
+    time.sleep(1)
+    #close_angle = -0.05
+    close_angle = -5
     speed = 0.5
     time_step = TIME_STEP
-    move_step = 0.0005
-    gripper_offset = 0.0125
-    approach_timeout = 10
     grasp_timeout = 5
-    lift_timeout = 15
-    success_threshold = 0.05
+    shake_timeout = 2
 
-    '''
-    # Move down to grasp
+    hand_pos_delta = 0.005
+    hand_ori_delta = 0
+
+    # Check if the gripper and object are in collision
     contacts = p.getContactPoints(target_obj, hand.hand_id)
     if len(contacts) > 0:
         print('ERROR: Gripper already in contact with object, exiting')
         p.disconnect()
         return False
-    tool_pos = init_pos
-    curr_hand_pos, _ = p.getBasePositionAndOrientation(hand.hand_id)
-    start_obj_pos, _ = p.getBasePositionAndOrientation(target_obj)
-    closest_points = p.getClosestPoints(hand.hand_id, target_obj, init_pos[2])
-    max_distance = -1
-    check_joint = True
-    if hand.hand_palm_joint_id < 0:
-        check_joint = False
-    for c in closest_points:
-        if c[8] > max_distance:
-            if check_joint:
-                if c[3] == hand.hand_palm_joint_id:
-                    max_distance = c[8]
-            else:
-                max_distance = c[8]
-    reach_limit = init_pos[2] - max_distance + gripper_offset
-    if reach_limit < minimum_grasp_height:
-        print('WARNING: reach_limit is too close to the floor')
-        reach_limit = minimum_grasp_height
-
-    t = 0
-    print('STATE: Approaching')
-    while tool_pos[2] > reach_limit:
-        p.stepSimulation()
-        tool_pos[2] = tool_pos[2] - move_step
-        p.changeConstraint(hand.base_constraint, tool_pos, init_ori, maxForce=100000)
-        time.sleep(time_step)
-        t = t + time_step
-        if t > approach_timeout:
-            print('ERROR: Waited and did not reach the desired position')
-            p.disconnect()
-            return False
 
     # Close the gripper
     print('STATE: Closing gripper')
@@ -269,41 +249,44 @@ def grasp_example(obj_id, obj_rot, obj_trans, grasp):
             print('ERROR: Waited and did not grasp')
             p.disconnect()
             return False
-
-    # Lift the object
-    print('STATE: Lifting')
-    lift_limit = init_pos[2] + 0.2
-    lift_height = lift_limit - tool_pos[2]
-    t = 0
     p.changeConstraint(obj_constraint, maxForce=0)
-    while tool_pos[2] < lift_limit:
+
+    # Shaking the object
+    time.sleep(1)
+    print('STATE: Shaking the object')
+    t = 0
+    while t < shake_timeout:
         p.stepSimulation()
-        tool_pos[2] = tool_pos[2] + move_step
-        p.changeConstraint(hand.base_constraint, tool_pos, init_ori, maxForce=100000)
+        curr_hand_pos, curr_hand_ori = p.getBasePositionAndOrientation(hand.hand_id)
+        dx = random.uniform(-hand_pos_delta, hand_pos_delta)
+        dy = random.uniform(-hand_pos_delta, hand_pos_delta)
+        dz = random.uniform(-hand_pos_delta, hand_pos_delta)
+        # print(dx, dy, dz)
+        curr_hand_pos = [curr_hand_pos[0] + random.uniform(-hand_pos_delta, hand_pos_delta),
+                         curr_hand_pos[1] + random.uniform(-hand_pos_delta, hand_pos_delta),
+                         curr_hand_pos[2] + random.uniform(-hand_pos_delta, hand_pos_delta)]
+        #curr_hand_ori = [curr_hand_ori[0] + random.uniform(-hand_ori_delta, hand_ori_delta),
+        #                 curr_hand_ori[1] + random.uniform(-hand_ori_delta, hand_ori_delta),
+        #                 curr_hand_ori[2] + random.uniform(-hand_ori_delta, hand_ori_delta)]
+        p.changeConstraint(hand.base_constraint, curr_hand_pos, curr_hand_ori, maxForce=100000)
         time.sleep(time_step)
         t = t + time_step
-        if t > lift_timeout:
-            print('ERROR: Waited and did not arrive at the lift height')
-            p.disconnect()
-            return False
-    time.sleep(1)
 
     # Check if successful
+    time.sleep(2)
     print('STATE: Checking success')
     # Success of object position is now higher (by the height the gripper is lifted)
     end_obj_pos, _ = p.getBasePositionAndOrientation(target_obj)
     contacts = p.getContactPoints(target_obj, hand.hand_id)
     success = False
-    if len(contacts) > 0 and lift_height - (end_obj_pos[2] - start_obj_pos[2]) <= success_threshold:
+    if len(contacts) > 0:
         print('Successfully grasped object!')
         success = True
     else:
         print('Failed to grasp object!')
-    '''
 
     p.disconnect()
-    #return success
-    return False
+    return success
 
 
 def load_pickle_data(f_name):
@@ -316,6 +299,7 @@ def load_pickle_data(f_name):
 
 
 if __name__ == '__main__':
+    random.seed(None)
     frame_ids = sorted(os.listdir(os.path.join(base_dir, data_split, scene, 'rgb')))
 
     for f in frame_ids:
