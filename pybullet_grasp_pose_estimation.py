@@ -6,16 +6,13 @@ import math
 import numpy as np
 import copy
 import pickle
-#import transforms3d as tf3d
-#import cv2
+import transforms3d as tf3d
 import random
 
 TIME_STEP = 1. / 240.
 #TIME_STEP = 1. / 480.
 
 base_dir = '/home/kw/0_code/hsr_hand_simulation/hsr_hand_simulation/objs/'
-#data_split = 'train'
-#scene = 'ABF10'
 
 class RobotGripper:
     def __init__(self, translation, orientation, is_open=True):
@@ -74,6 +71,8 @@ class RobotGripper:
         for j_id, j in enumerate(self.target_joint):
             if self.contact[j_id]:
                 # dynamics = p.getDynamicsInfo(self.hand_id,j)
+                #p.changeDynamics(self.hand_id, linkIndex=j, mass = 1, 
+                #                 rollingFriction=0.7, localInertiaDiagonal = [1,1,1])  # , lateralFriction=0.1)#,contactStiffness=0.001,contactDamping=0.99)
                 p.changeDynamics(self.hand_id, linkIndex=j,
                                  rollingFriction=0.7)  # , lateralFriction=0.1)#,contactStiffness=0.001,contactDamping=0.99)
             else:
@@ -192,7 +191,7 @@ def env():
     # button(s)
     pauseID = p.addUserDebugParameter("toggle pause",1,0,1)
 
-    # use a list for returning more parameters
+    # optional: list for returning more parameters
     paramIDs = pauseID
 
     return paramIDs
@@ -208,7 +207,62 @@ def place_grippers(num_grippers):
         grippers.append(RobotGripper([init_pos[0]+i, init_pos[1], init_pos[2]], init_ori))
 
     return grippers
-        
+
+def matTransf(grasp_poses):
+    # Object
+    obj_pos = np.copy(grasp_poses["obj_pos"])
+    obj_ori = np.copy(grasp_poses["obj_ori"])
+    
+    # Gripper
+    init_pos = np.copy(grasp_poses["grasp_pos"])
+    init_ori = np.copy(grasp_poses["grasp_ori"])
+
+    obj_mat = np.matrix(obj_pos)
+    gripp_mat = np.matrix(init_pos)
+
+    # homogeneous coordinates
+    hom_obj_pos = np.concatenate((obj_mat.T, np.matrix([1])))
+    hom_gripp_pos = np.concatenate((gripp_mat.T, np.matrix([1])))
+
+    # transformation matrices
+    transl_mat_obj = np.matrix(np.identity(4))
+    transl_mat_obj[:3,3] = obj_mat.T * -1
+    transl_mat_gripp = np.matrix(np.identity(4))
+    transl_mat_gripp[:3,3] = gripp_mat.T * -1
+
+    # pure translations
+    transl_obj_pos = np.matmul(transl_mat_obj,hom_obj_pos)
+    transl_gripper_pos = np.matmul(transl_mat_gripp,hom_gripp_pos)
+
+    # rotations matrices
+    rot_mat_obj = np.matrix(p.getMatrixFromQuaternion(obj_ori)).reshape(3,3)
+    hom_rot_mat_obj = np.concatenate((np.concatenate((rot_mat_obj, np.matrix([0, 0, 0]).T), 1), np.matrix([0, 0, 0, 1])))
+    rot_mat_gripp = np.matrix(p.getMatrixFromQuaternion(init_ori)).reshape(3,3)
+    hom_rot_mat_gripp = np.concatenate((np.concatenate((rot_mat_gripp, np.matrix([0, 0, 0]).T), 1), np.matrix([0, 0, 0, 1])))
+
+    # pure rotations of the gripper
+    rotated_gripper = np.matmul(hom_rot_mat_gripp,np.linalg.inv(hom_rot_mat_gripp))
+    obj_rotated_gripper = np.matmul(rotated_gripper,np.linalg.inv(hom_rot_mat_obj))
+    final_rotated_gripper = np.matmul(obj_rotated_gripper,hom_rot_mat_gripp)
+
+    # difference of the two initial positions
+    diff_vec = hom_gripp_pos - hom_obj_pos
+    diff_vec *= -1
+    diff_vec[3] = 1
+    
+    # transform the difference vector
+    obj_gripp_transl_gripper_pos = np.matmul(final_rotated_gripper,diff_vec)
+
+    if obj_gripp_transl_gripper_pos[2] < 0:
+        obj_gripp_transl_gripper_pos[2] *= -1
+
+    init_pos = obj_gripp_transl_gripper_pos[:3]
+    q = tf3d.quaternions.mat2quat(final_rotated_gripper[:3,:3])
+    init_ori = [q[1], q[2], q[3], q[0]]
+
+    grasp_poses["grasp_rot"] = final_rotated_gripper
+    grasp_poses["grasp_transl"] = obj_gripp_transl_gripper_pos[:3]
+
 def grasp_example(obj_name, grasp_poses, paramIDs, num_grippers):
     
     # Plane
@@ -245,6 +299,7 @@ def grasp_example(obj_name, grasp_poses, paramIDs, num_grippers):
                                     basePosition=(obj_pos[0]+i, obj_pos[1], obj_pos[2]),
                                     baseOrientation=obj_ori)
 
+        # get Axis Aligned Bounding Box
         min_vals = list(p.getAABB(target_obj)[0])
         max_vals = list(p.getAABB(target_obj)[1])
 
@@ -256,11 +311,10 @@ def grasp_example(obj_name, grasp_poses, paramIDs, num_grippers):
         mean_y = (max_vals[1] + min_vals[1]) / 2
         mean_z = (max_vals[2] + min_vals[2]) / 2
 
-        # align each object centered below each gripper
+        # Align each object centered below each gripper
         # x around i (0, 1, 2, ...)
         # y around 0
         # z starts at 0.2
-        
         new_x = ((obj_pos[0] + i) - mean_x) + i
         new_y = obj_pos[1] - mean_y
         new_z = obj_pos[2] - mean_z + ( dy / 2 ) + 0.2
@@ -282,12 +336,12 @@ def grasp_example(obj_name, grasp_poses, paramIDs, num_grippers):
         target_objs.append(target_obj)
         obj_constraints.append(obj_constraint)
 
-    #temp_obj_pos = [new_x, new_y, new_z]
+    # Keep used object position
     grasp_poses["obj_pos"], _ = p.getBasePositionAndOrientation(target_objs[0])
 
-    # parameters for lifting (or moving down the gripper)
     time.sleep(1)
 
+    # parameters for lifting (or moving down the gripper)
     minimum_grasp_height = 0.225
     close_angle = -0.05
     speed = 0.5
@@ -305,7 +359,7 @@ def grasp_example(obj_name, grasp_poses, paramIDs, num_grippers):
     hand_pos_delta = 0.005
     hand_ori_delta = 0.005
 
-    # keep inital positions
+    # Keep inital positions
     init_pos = list(hand[0].translation)
     tool_pos = init_pos
 
@@ -315,7 +369,7 @@ def grasp_example(obj_name, grasp_poses, paramIDs, num_grippers):
         if len(contacts) > 0:
             print('ERROR: Gripper already in contact with object, exiting')
             # p.disconnect()
-            return False
+            return 0
 
     if not grasp_poses["is_initial"]:
         for i in range(num_grippers):
@@ -357,10 +411,14 @@ def grasp_example(obj_name, grasp_poses, paramIDs, num_grippers):
             if t > approach_timeout:
                 print('ERROR: Waited and did not reach the desired position')
                 # p.disconnect()
-                return False
+                return 0
         
-        # keep grasp position
+        # Keep grasp position
         temp_pos = list(hand[0].translation)
+        # Change saved gripper height in z-direction in relation to the height difference of the object - possibly pushed down while approaching
+        curr_pos, _ = p.getBasePositionAndOrientation(target_objs[0])
+        diff_pos = list(grasp_poses["obj_pos"])[2] - list(curr_pos)[2]
+        temp_pos[2] += diff_pos + gripper_offset
 
     start_obj_pos, _ = p.getBasePositionAndOrientation(target_objs[0])
 
@@ -378,14 +436,14 @@ def grasp_example(obj_name, grasp_poses, paramIDs, num_grippers):
         if t > grasp_timeout:
             print('ERROR: Waited and did not grasp')
             # p.disconnect()
-            return False
+            return 0
 
     # Lift the object
     print('STATE: Lifting')
 
     lift_limit = init_pos[2] + 0.2
-
     lift_height = lift_limit - tool_pos[2]
+
     t = 0
 
     for i in range(num_grippers):
@@ -411,26 +469,29 @@ def grasp_example(obj_name, grasp_poses, paramIDs, num_grippers):
         if t > lift_timeout:
             print('ERROR: Waited and did not arrive at the lift height')
             # p.disconnect()
-            return False
+            return 0
     time.sleep(1)
 
     # Check if successful
     print('STATE: Checking success')
     # Success of object position is now higher (by the height the gripper is lifted)
-    end_obj_pos, _ = p.getBasePositionAndOrientation(target_obj)
-    contacts = p.getContactPoints(target_obj, hand[i].hand_id)
-    success = False
-    if len(contacts) > 0 and lift_height - (end_obj_pos[2] - start_obj_pos[2]) <= success_threshold:
-        print('Successfully grasped object!')
-        if(grasp_poses["is_initial"]):
-            grasp_poses["grasp_pos"] = temp_pos
-        success = True
-    else:
-        print('Failed to grasp object!')
-        # p.disconnect()
-        # return success
+    success = 0
 
-    p.changeConstraint(obj_constraint, maxForce=0)
+    for i in range(num_grippers):
+        end_obj_pos, _ = p.getBasePositionAndOrientation(target_objs[i])
+        contacts = p.getContactPoints(target_objs[i], hand[i].hand_id)
+
+        if len(contacts) > 0 and lift_height - (end_obj_pos[2] - start_obj_pos[2]) <= success_threshold:
+            print('Successfully grasped and lifted object with the %s. gripper!' % str(i+1))
+            if(grasp_poses["is_initial"]):
+                grasp_poses["grasp_pos"] = temp_pos
+            success += 1
+        else:
+            print('Failed to grasp and lift object! with the %s. gripper!' % str(i+1))
+            # p.disconnect()
+            # return success
+
+        p.changeConstraint(obj_constraint, maxForce=0)
 
     if success:
         # Shaking the object
@@ -469,10 +530,13 @@ def grasp_example(obj_name, grasp_poses, paramIDs, num_grippers):
         contacts = p.getContactPoints(target_objs[i], hand[i].hand_id)
 
         if len(contacts) > 0:
-            print('Successfully grasped object!')
+            print('Successfully grasped and shaked object with the %s. gripper!' % str(i+1))
             success += 1
         else:
-            print('Failed to grasp object!')
+            print('Failed to grasp and shake object with the %s. gripper!' % str(i+1))
+
+    # transform grasp pose to a rotation matrix
+    matTransf(grasp_poses)
 
     #grasp_poses["grasp_pos"] = temp_pos
     p.resetSimulation()
@@ -496,7 +560,6 @@ if __name__ == '__main__':
     
     grasp_dir = base_dir.replace("objs", "grasp_poses")
 
-    # frame_ids = sorted(os.listdir(os.path.join(base_dir, data_split, scene, 'rgb')))
     frame_ids = sorted(os.listdir(base_dir))
     frame_grasps = sorted(os.listdir(grasp_dir))
 
@@ -521,14 +584,23 @@ if __name__ == '__main__':
             print('Create one with default values ...\n')
 
             # improvements: calculate poses for a given number
+            '''
             grasp_poses = { 1: {'obj_pos': [0, 0, 0], 'obj_ori': p.getQuaternionFromEuler([0, 0, 0]), 'grasp_pos': [0, 0, 0.5], 'is_initial': True, 'success_rate': 0},
                             2: {'obj_pos': [0, 0, 0], 'obj_ori': p.getQuaternionFromEuler([math.pi/2, 0, 0]), 'grasp_pos': [0, 0, 0.5], 'is_initial': True, 'success_rate': 0},
                             3: {'obj_pos': [0, 0, 0], 'obj_ori': p.getQuaternionFromEuler([math.pi/2, math.pi/2, 0]), 'grasp_pos': [0, 0, 0.5], 'is_initial': True, 'success_rate': 0},
                             4: {'obj_pos': [0, 0, 0], 'obj_ori': p.getQuaternionFromEuler([0, math.pi/2, 0]), 'grasp_pos': [0, 0, 0.5], 'is_initial': True, 'success_rate': 0},
                             5: {'obj_pos': [0, 0, 0], 'obj_ori': p.getQuaternionFromEuler([math.pi/2, 0, math.pi/2]), 'grasp_pos': [0, 0, 0.5], 'is_initial': True, 'success_rate': 0},
                             6: {'obj_pos': [0, 0, 0], 'obj_ori': p.getQuaternionFromEuler([0, 0, math.pi/2]), 'grasp_pos': [0, 0, 0.5], 'is_initial': True, 'success_rate': 0} }
+            '''
+            grasp_poses = { 1: {'obj_pos': [0, 0, 0], 'obj_ori': p.getQuaternionFromEuler([0, 0, 0]), 'grasp_pos': [0, 0, 0.5], 'grasp_ori': p.getQuaternionFromEuler([0, math.pi, 0]), 'grasp_rot': np.matrix(np.identity(4)), 'grasp_transl': np.matrix([0, 0, 0, 1]), 'is_initial': True, 'success_rate': 0},
+                            2: {'obj_pos': [0, 0, 0], 'obj_ori': p.getQuaternionFromEuler([math.pi/2, 0, 0]), 'grasp_pos': [0, 0, 0.5], 'grasp_ori': p.getQuaternionFromEuler([0, math.pi, 0]), 'grasp_rot': np.matrix(np.identity(4)), 'grasp_transl': np.matrix([0, 0, 0, 1]), 'is_initial': True, 'success_rate': 0},
+                            3: {'obj_pos': [0, 0, 0], 'obj_ori': p.getQuaternionFromEuler([math.pi/2, math.pi/2, 0]), 'grasp_pos': [0, 0, 0.5], 'grasp_ori': p.getQuaternionFromEuler([0, math.pi, 0]), 'grasp_rot': np.matrix(np.identity(4)), 'grasp_transl': np.matrix([0, 0, 0, 1]), 'is_initial': True, 'success_rate': 0},
+                            4: {'obj_pos': [0, 0, 0], 'obj_ori': p.getQuaternionFromEuler([0, math.pi/2, 0]), 'grasp_pos': [0, 0, 0.5], 'grasp_ori': p.getQuaternionFromEuler([0, math.pi, 0]), 'grasp_rot': np.matrix(np.identity(4)), 'grasp_transl': np.matrix([0, 0, 0, 1]), 'is_initial': True, 'success_rate': 0},
+                            5: {'obj_pos': [0, 0, 0], 'obj_ori': p.getQuaternionFromEuler([math.pi/2, 0, math.pi/2]), 'grasp_pos': [0, 0, 0.5], 'grasp_ori': p.getQuaternionFromEuler([0, math.pi, 0]), 'grasp_rot': np.matrix(np.identity(4)), 'grasp_transl': np.matrix([0, 0, 0, 1]), 'is_initial': True, 'success_rate': 0},
+                            6: {'obj_pos': [0, 0, 0], 'obj_ori': p.getQuaternionFromEuler([0, 0, math.pi/2]), 'grasp_pos': [0, 0, 0.5], 'grasp_ori': p.getQuaternionFromEuler([0, math.pi, 0]), 'grasp_rot': np.matrix(np.identity(4)), 'grasp_transl': np.matrix([0, 0, 0, 1]), 'is_initial': True, 'success_rate': 0} }
         else:
             grasp_poses = load_pickle_data(grasp_f)
+
             for pose_key, pose_values in grasp_poses.items():
                 pose_values['is_initial'] = False
 
@@ -537,11 +609,11 @@ if __name__ == '__main__':
             success_count = 0
 
             for a in range(num_samples):
-                success_count = grasp_example(f, pose_values, paramIDs, num_grippers)
+                success_count += grasp_example(f, pose_values, paramIDs, num_grippers)
 
-            success_rate = success_count / (num_grippers * num_samples) * 100
+            success_rate = float(success_count) / float(num_grippers * num_samples)
 
-            print('%.1f%% success for object %s\n' % (success_rate, f))
+            print('%.1f%% success for object %s\n' % (success_rate * 100, f))
             pose_values['success_rate'] = success_rate
             
         # Save all values  

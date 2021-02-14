@@ -4,14 +4,8 @@ import pybullet_data
 import os
 import math
 import numpy as np
-import copy
 import pickle
-#import transforms3d as tf3d
-#import cv2
-import random
-
-TIME_STEP = 1. / 240.
-#TIME_STEP = 1. / 480.
+import transforms3d as tf3d
 
 base_dir = '/home/kw/0_code/hsr_hand_simulation/hsr_hand_simulation/objs/'
 #data_split = 'train'
@@ -183,28 +177,36 @@ def env():
     # button(s)
     buttonID = p.addUserDebugParameter("next",1,0,1)
 
-    # use a list for returning more parameters
+    # optional: list for returning more parameters
     paramIDs = buttonID
 
     return paramIDs
 
 def visualize(obj_name, grasp_poses, buttonID):
     # Plane
-    p.loadURDF("plane.urdf")
+    #p.loadURDF("plane.urdf")
 
     temp = p.readUserDebugParameter(buttonID)
 
     model_fn = os.path.join(base_dir, obj_name)
     
-    obj_pos = np.copy(grasp_poses["obj_pos"])
-    obj_ori = np.copy(grasp_poses["obj_ori"])
+    # Object
+    #obj_pos = [np.copy(grasp_poses["obj_pos"])]
+    #obj_ori = np.copy(grasp_poses["obj_ori"])
+
+    obj_pos = [0, 0, 0]
+    obj_ori = p.getQuaternionFromEuler([0, 0, 0])  
 
     mesh_scale = [0.001, 0.001, 0.001]
     # mesh_scale = [1.0, 1.0, 1.0]
     
     # Gripper
-    init_pos = np.copy(grasp_poses["grasp_pos"])
-    init_ori = p.getQuaternionFromEuler([0, math.pi, 0])  
+    #init_pos = np.copy(grasp_poses["grasp_pos"])
+    #init_ori = np.copy(grasp_poses["grasp_ori"]) 
+
+    init_pos = np.copy(grasp_poses["grasp_transl"])
+    q = tf3d.quaternions.mat2quat(grasp_poses["grasp_rot"][:3,:3])
+    init_ori = [q[1], q[2], q[3], q[0]]
 
     hand = RobotGripper(init_pos, init_ori)
 
@@ -234,18 +236,19 @@ def visualize(obj_name, grasp_poses, buttonID):
                                         childFrameOrientation=obj_ori)
     p.changeConstraint(obj_constraint, maxForce=10)
 
-    #p.addUserDebugText("Hello!", [0, 0, 0.6], textColorRGB=[1,0,0], textSize=1.5)
-    p.addUserDebugText("Success rate: %.1f%%" % (grasp_poses["success_rate"]), [0, 0, 0.6], textColorRGB=[1,0,0], textSize=1.5)
+    # color: red - orange - green for success_rate 0 - 100%
+    if grasp_poses["success_rate"] == 0.0:
+        p.addUserDebugText("Success rate: %.1f%%" % (grasp_poses["success_rate"] * 100), [0, 0, 0.6], textColorRGB=[1,0,0], textSize=1.5)
+    elif ((grasp_poses["success_rate"] > 0.0) and (grasp_poses["success_rate"] < 1.0)):
+        p.addUserDebugText("Success rate: %.1f%%" % (grasp_poses["success_rate"] * 100), [0, 0, 0.6], textColorRGB=[1,0.65,0], textSize=1.5)
+    else:
+        p.addUserDebugText("Success rate: %.1f%%" % (grasp_poses["success_rate"] * 100), [0, 0, 0.6], textColorRGB=[0,1,0], textSize=1.5)
 
     while (temp == p.readUserDebugParameter(buttonID)):
         # stay in the loop until the button has again been pressed
         time.sleep(1)
 
-    #grasp_poses["grasp_pos"] = temp_pos
     p.resetSimulation()
-
-    #p.disconnect()
-    # return ...
 
 def load_pickle_data(f_name):
     with open(f_name, 'rb') as f:
@@ -285,8 +288,8 @@ if __name__ == '__main__':
         else:
             grasp_poses = load_pickle_data(grasp_f)
 
-        for pose_key, pose_values in grasp_poses.items():
-            # call visualization function
-            visualize(f, pose_values, paramIDs)
+            for pose_key, pose_values in grasp_poses.items():
+                visualize(f, pose_values, paramIDs)
 
     p.disconnect()
+    
