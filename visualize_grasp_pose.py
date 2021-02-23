@@ -7,7 +7,7 @@ import numpy as np
 import pickle
 import transforms3d as tf3d
 
-base_dir = '/home/kw/0_code/hsr_hand_simulation/hsr_hand_simulation/objs/'
+base_dir = '/home/kw/0_code/grasping/hsr_hand_simulation/hsr_hand_simulation/objs/'
 #data_split = 'train'
 #scene = 'ABF10'
 
@@ -197,8 +197,8 @@ def visualize(obj_name, grasp_poses, buttonID):
     obj_pos = [0, 0, 0]
     obj_ori = p.getQuaternionFromEuler([0, 0, 0])  
 
-    mesh_scale = [0.001, 0.001, 0.001]
-    # mesh_scale = [1.0, 1.0, 1.0]
+    #mesh_scale = [0.001, 0.001, 0.001]
+    mesh_scale = [1.0, 1.0, 1.0]
     
     # Gripper
     #init_pos = np.copy(grasp_poses["grasp_pos"])

@@ -12,7 +12,7 @@ import random
 TIME_STEP = 1. / 240.
 #TIME_STEP = 1. / 480.
 
-base_dir = '/home/kw/0_code/hsr_hand_simulation/hsr_hand_simulation/objs/'
+base_dir = '/home/kw/0_code/grasping/hsr_hand_simulation/hsr_hand_simulation/objs/'
 
 class RobotGripper:
     def __init__(self, translation, orientation, is_open=True):
@@ -273,8 +273,8 @@ def grasp_example(obj_name, grasp_poses, paramIDs, num_grippers):
     obj_pos = np.copy(grasp_poses["obj_pos"])
     obj_ori = np.copy(grasp_poses["obj_ori"])
 
-    mesh_scale = [0.001, 0.001, 0.001]
-    # mesh_scale = [1.0, 1.0, 1.0]
+    # mesh_scale = [0.001, 0.001, 0.001]
+    mesh_scale = [1.0, 1.0, 1.0]
     
     hand = place_grippers(num_grippers)
 

@@ -1,7 +1,7 @@
 import os
 import pickle
 
-base_dir = '/home/kw/0_code/hsr_hand_simulation/hsr_hand_simulation/grasp_poses/'
+base_dir = '/home/kw/0_code/grasping/hsr_hand_simulation/hsr_hand_simulation/grasp_poses/'
 
 def load_pickle_data(f_name):
     with open(f_name, 'rb') as f:
