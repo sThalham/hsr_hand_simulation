@@ -7,7 +7,9 @@ import numpy as np
 import pickle
 import transforms3d as tf3d
 
-base_dir = '/home/kw/0_code/grasping/hsr_hand_simulation/hsr_hand_simulation/objs/'
+base_dir = os.path.dirname(os.path.abspath(__file__))
+obj_dir = os.path.join(base_dir, "objs")
+
 #data_split = 'train'
 #scene = 'ABF10'
 
@@ -188,7 +190,7 @@ def visualize(obj_name, grasp_poses, buttonID):
 
     temp = p.readUserDebugParameter(buttonID)
 
-    model_fn = os.path.join(base_dir, obj_name)
+    model_fn = os.path.join(obj_dir, obj_name)
     
     # Object
     #obj_pos = [np.copy(grasp_poses["obj_pos"])]
@@ -263,10 +265,10 @@ if __name__ == '__main__':
     # start GUI and get ids of buttons, etc.
     paramIDs = env()
     
-    grasp_dir = base_dir.replace("objs", "grasp_poses")
+    grasp_dir = obj_dir.replace("objs", "grasp_poses")
 
     # frame_ids = sorted(os.listdir(os.path.join(base_dir, data_split, scene, 'rgb')))
-    frame_ids = sorted(os.listdir(base_dir))
+    frame_ids = sorted(os.listdir(obj_dir))
     frame_grasps = sorted(os.listdir(grasp_dir))
 
     grasp_poses = {}

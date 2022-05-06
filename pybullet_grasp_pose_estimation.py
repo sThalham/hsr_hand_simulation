@@ -12,7 +12,10 @@ import random
 TIME_STEP = 1. / 240.
 #TIME_STEP = 1. / 480.
 
-base_dir = '/home/kw/0_code/grasping/hsr_hand_simulation/hsr_hand_simulation/objs/'
+NUM_GRIPPERS = 3
+
+base_dir = os.path.dirname(os.path.abspath(__file__))
+obj_dir = os.path.join(base_dir, "objs")
 
 class RobotGripper:
     def __init__(self, translation, orientation, is_open=True):
@@ -268,7 +271,7 @@ def grasp_example(obj_name, grasp_poses, paramIDs, num_grippers):
     # Plane
     p.loadURDF("plane.urdf")
 
-    model_fn = os.path.join(base_dir, obj_name)
+    model_fn = os.path.join(obj_dir, obj_name)
     
     obj_pos = np.copy(grasp_poses["obj_pos"])
     obj_ori = np.copy(grasp_poses["obj_ori"])
@@ -558,12 +561,12 @@ if __name__ == '__main__':
     # start GUI and get ids of buttons, etc.
     paramIDs = env()
     
-    grasp_dir = base_dir.replace("objs", "grasp_poses")
+    grasp_dir = obj_dir.replace("objs", "grasp_poses")
 
-    frame_ids = sorted(os.listdir(base_dir))
+    frame_ids = sorted(os.listdir(obj_dir))
     frame_grasps = sorted(os.listdir(grasp_dir))
 
-    num_grippers = 3
+    num_grippers = NUM_GRIPPERS
     num_samples = 1
 
     grasp_poses = {}
