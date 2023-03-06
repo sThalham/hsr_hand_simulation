@@ -150,10 +150,10 @@ def grasp_example():
     #p.connect(p.DIRECT)
     p.connect(p.GUI)
     p.setAdditionalSearchPath(pybullet_data.getDataPath())  # optional
-    p.setGravity(0, 0, -10)
+    p.setGravity(0, 0, 0)
 
     # Gripper
-    init_pos = [0, 0, 0.5]
+    init_pos = [0, 0, 0.2]
     init_ori = p.getQuaternionFromEuler([0, math.pi, 0])
     hand = RobotGripper(init_pos, init_ori)
 
@@ -162,17 +162,21 @@ def grasp_example():
 
     # Select the object
     grasp_watering_can = False
-    if grasp_watering_can:
-        model_fn = "./objs/can_linemod.obj"
-        obj_pos = [-0.1, 0, 0.1]
-        obj_ori = p.getQuaternionFromEuler([0, math.pi/2, math.pi/2])
-    else:
-        model_fn = "./objs/obj_000003.obj"
-        obj_pos = [0, 0, 0.1]
-        obj_ori = p.getQuaternionFromEuler([0, 0, 0])
+    #if grasp_watering_can:
+    #    model_fn = "./objs/can_linemod.obj"
+    #    obj_pos = [-0.1, 0, 0.1]
+    #    obj_ori = p.getQuaternionFromEuler([0, math.pi/2, math.pi/2])
+    #else:
+    #    model_fn = "./objs/obj_000003.obj"
+    #    obj_pos = [0, 0, 0.1]
+    #    obj_ori = p.getQuaternionFromEuler([0, 0, 0])
         #obj_pos = [0, 0, 0.015]
         #obj_ori = p.getQuaternionFromEuler([0, math.pi/2, 0])
-    mesh_scale = [0.001, 0.001, 0.001]
+    mesh_scale = [1.0, 1.0, 1.0]
+    model_fn = "./canister/canister.obj"
+    obj_pos = [0.0, 0.0, 0.05]
+    obj_ori = p.getQuaternionFromEuler([0.0, 0.0, 0.0])
+    #mesh_scale = [0.001, 0.001, 0.001]
 
     # Add object to the environment
     visual_shape_id = p.createVisualShape(shapeType=p.GEOM_MESH,
@@ -202,7 +206,7 @@ def grasp_example():
     p.changeConstraint(obj_constraint, maxForce=0)
 
     time.sleep(2)
-    minimum_grasp_height = 0.225
+    minimum_grasp_height = 0.10
     close_angle = -0.05
     speed = 0.5
     time_step = TIME_STEP
@@ -307,8 +311,9 @@ def render_example():
     p.setGravity(0, 0, -10)
     p.loadURDF("plane.urdf")
     mesh_scale = [0.001, 0.001, 0.001]
-    model_fn = "./objs/obj_000003.obj"
+    #model_fn = "./objs/obj_000003.obj"
     # model_fn = "./objs/can_linemod.obj"
+    model_fn = "./canister/canister.obj"
     obj_pos = [0, 0, 0.1]
     obj_ori = p.getQuaternionFromEuler([0, 0, 0])
     # Create axis
@@ -368,8 +373,8 @@ def render_example():
     depth = np.reshape(depth, (h, w))
 
     import scipy.misc
-    scipy.misc.toimage(rgb, cmin=0.0, cmax=255).save('/home/tpatten/rgb.png')
-    scipy.misc.toimage(depth, cmin=np.min(depth), cmax=np.max(depth)).save('/home/tpatten/depth.png')
+    scipy.misc.toimage(rgb, cmin=0.0, cmax=255).save('/home/stefan/hsr_hand_simulation/rgb.png')
+    scipy.misc.toimage(depth, cmin=np.min(depth), cmax=np.max(depth)).save('/home/stefan/hsr_hand_simulation/depth.png')
 
     p.disconnect()
 
